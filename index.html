@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello Kitty & Flor de Resiliencia 🎀🌻</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://public.codepenassets.com/css/reset-2.0.min.css">
+
+    <style>
+        /* --- ESTILOS BASE --- */
+        body, html { 
+            margin: 0; padding: 0; overflow: hidden; height: 100%; width: 100%;
+            background-color: #1b1b1b; font-family: 'Montserrat', sans-serif; 
+        }
+
+        #section-kitty { position: relative; width: 100%; height: 100%; z-index: 10; display: block; }
+        #section-flower { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: #050505; z-index: 20; }
+
+        /* --- ESTILOS KITTY (HTML 1) --- */
+        #draw_canvas, #hand_canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+        #draw_canvas { z-index: 2; }
+        #hand_canvas { z-index: 3; pointer-events: none; }
+        #video_bg { display: none; }
+        #guide_container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80vw; max-width: 500px; opacity: 0.25; pointer-events: none; z-index: 1; }
+        #ui-container { position: absolute; bottom: 20px; right: 20px; z-index: 10; }
+        .glass-panel { display: flex; flex-direction: column; align-items: center; background: rgba(20, 10, 15, 0.85); backdrop-filter: blur(12px); border: 2px solid rgba(236, 72, 153, 0.4); border-radius: 24px; padding: 20px 15px; box-shadow: 0 8px 32px rgba(236, 72, 153, 0.2); color: white; gap: 12px; }
+        .color-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); transition: all 0.3s ease; }
+        .color-btn.active { border: 4px solid white; transform: scale(1.15); box-shadow: 0 0 15px currentColor; }
+        .action-btn { width: 100%; font-size: 10px; font-weight: bold; padding: 8px; border-radius: 12px; transition: opacity 0.2s; }
+
+        /* --- ESTILOS FLOR (HTML 2) --- */
+        .flower-message { position: absolute; top: 50%; left: calc(50vw + 30vmin); transform: translateY(-50%); font-weight: 900; text-transform: uppercase; letter-spacing: -1px; z-index: 10; white-space: nowrap; opacity: 0; transition: opacity 0.7s; font-size: 3.8vmin; color: #ffffff; text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 2px 4px rgba(0,0,0,0.5); }
+        .wrapper { position: absolute; top: 0; right: 0; bottom: 0; left: 0; margin: auto; width: 10vmin; height: 10vmin; font-size: 10vmin; transform: rotateX(-45deg); transform-style: preserve-3d; animation: move-left 1.5s cubic-bezier(.7,0,.3,1) 1 forwards; }
+        @keyframes move-left { 0% { transform: rotateX(-45deg) translateX(0); } 100% { transform: rotateX(-45deg) translateX(-20vw); } }
+        .flower { width: 10vmin; height: 10vmin; animation: rotate-flower 30s linear infinite; transform-style: preserve-3d; }
+        .flower:before { content: ""; display: block; position: absolute; width: 95%; height: 95%; top: 0; right: 0; bottom: 0; left: 0; margin: auto; background: radial-gradient(circle, #4b3621 0%, #8b4513 50%, #cd853f 100%); border-radius: 50%; transform: rotateX(90deg); box-shadow: 0 0 15px rgba(205, 133, 63, 0.5); }
+        .petal { position: absolute; z-index: 20; bottom: 80%; left: -10vmin; transform-style: preserve-3d; transform-origin: bottom; }
+        .box { width: 30vmin; transform-style: preserve-3d; transform-origin: bottom; animation: rotate-box 12s infinite; }
+        .shape { width: 0.5em; height: 0.5em; margin: auto; background: currentColor; box-shadow: 0.5em 0 0 0, 1em 0 0 0, -1em 0 0 0, -0.5em 0 0 0; border-radius: 50%; filter: drop-shadow(0 0 2px rgba(255,215,0,0.3)); }
+        @keyframes rotate-box { 0%, 15%, 100% { transform: rotateX(3.5deg); } 50%, 80% { transform: rotateX(-7deg); } }
+        @keyframes rotate-flower { 100% { transform: rotateY(360deg); } }
+        #galaxy-canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1; background: transparent; transition: opacity 2s; }
+        .container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 100; padding: 3px; background: linear-gradient(90deg, #ffeb3b, #ff9800); border-radius: 0.9em; transition: all 0.4s ease; display: none; } /* Botón Oculto */
+        .container .button { font-size: 1.4em; padding: 0.6em 0.8em; border-radius: 0.5em; border: none; background-color: #000; color: #fff; cursor: pointer; box-shadow: 2px 2px 3px #000000b4; min-width: 160px; font-family: inherit; font-weight: bold; }
+
+        @media (max-width: 480px) {
+            .wrapper { width: 18vmin !important; height: 18vmin !important; font-size: 12vmin !important; animation: move-up-mobile 1.2s cubic-bezier(.7,0,.3,1) 1 forwards !important; left: 50% !important; top: 40% !important; }
+            @keyframes move-up-mobile { 0% { transform: rotateX(-45deg) translateY(0) translateX(-50%); } 100% { transform: rotateX(-45deg) translateY(-15vh) translateX(-50%); } }
+            .flower-message { position: fixed !important; bottom: 15vh !important; left: 50% !important; transform: translateX(-50%) !important; white-space: normal !important; font-size: 5.5vmin !important; text-align: center !important; max-width: 85vw !important; z-index: 100 !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="section-kitty">
+        <video id="video_bg" autoplay playsinline></video>
+        <div id="guide_container">
+            <svg viewBox="0 0 500 400" width="100%" height="100%">
+                <ellipse cx="250" cy="220" rx="180" ry="130" fill="none" stroke="white" stroke-width="8" stroke-dasharray="15,10"/>
+                <path d="M 110 140 L 90 30 L 200 100" fill="none" stroke="white" stroke-width="8" stroke-dasharray="15,10"/>
+                <path d="M 390 140 L 410 30 L 300 100" fill="none" stroke="white" stroke-width="8" stroke-dasharray="15,10"/>
+                <ellipse cx="170" cy="230" rx="15" ry="25" fill="none" stroke="white" stroke-width="8"/><ellipse cx="330" cy="230" rx="15" ry="25" fill="none" stroke="white" stroke-width="8"/><ellipse cx="250" cy="260" rx="20" ry="15" fill="none" stroke="white" stroke-width="8"/>
+                <line x1="20" y1="200" x2="100" y2="210" stroke="white" stroke-width="8" stroke-dasharray="10,5"/><line x1="10" y1="230" x2="90" y2="230" stroke="white" stroke-width="8" stroke-dasharray="10,5"/><line x1="20" y1="260" x2="100" y2="250" stroke="white" stroke-width="8" stroke-dasharray="10,5"/>
+                <line x1="480" y1="200" x2="400" y2="210" stroke="white" stroke-width="8" stroke-dasharray="10,5"/><line x1="490" y1="230" x2="410" y2="230" stroke="white" stroke-width="8" stroke-dasharray="10,5"/><line x1="480" y1="260" x2="400" y2="250" stroke="white" stroke-width="8" stroke-dasharray="10,5"/>
+                <circle cx="360" cy="110" r="15" fill="none" stroke="white" stroke-width="8"/><path d="M 350 100 L 310 70 L 320 130 Z" fill="none" stroke="white" stroke-width="8"/><path d="M 370 100 L 410 70 L 400 130 Z" fill="none" stroke="white" stroke-width="8"/>
+            </svg>
+        </div>
+        <canvas id="draw_canvas"></canvas>
+        <canvas id="hand_canvas"></canvas>
+        <div id="ui-container">
+            <div class="glass-panel">
+                <h1 class="text-[10px] uppercase text-pink-400 font-bold" id="status-text">Listos</h1>
+                <div class="flex flex-col gap-2">
+                    <button id="btn-pink" class="color-btn" style="background-color: #EC4899;" onclick="setColor('#EC4899', 'btn-pink')"></button>
+                    <button id="btn-white" class="color-btn active" style="background-color: #FFFFFF;" onclick="setColor('#FFFFFF', 'btn-white')"></button>
+                    <button id="btn-black" class="color-btn" style="background-color: #000000;" onclick="setColor('#000000', 'btn-black')"></button>
+                    <button id="btn-yellow" class="color-btn" style="background-color: #FBBF24;" onclick="setColor('#FBBF24', 'btn-yellow')"></button>
+                </div>
+                <div class="flex flex-col gap-2 w-full mt-2">
+                    <button class="action-btn bg-red-500/80" onclick="clearCanvas()">BORRAR</button>
+                    <button class="action-btn bg-green-500/80" onclick="saveCanvas()">GUARDAR</button>
+                </div>
+                <div class="text-[9px] text-pink-200 text-center leading-tight mt-1">
+                    1: Dibujar<br>2: Rosa<br>3: Blanco<br>4: Negro<br>5: Amarillo
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="section-flower">
+        <div id="main-content">
+            <div class="container" id="start-btn-container">
+                <button id="start-btn" class="button"></button>
+            </div>
+            <audio id="bg-music" src="musica/Juanes - Es Por Ti (Official Music Video).mp3" preload="auto"></audio>
+            <canvas id="galaxy-canvas" style="display:none; opacity:0; will-change:opacity;"></canvas>
+            <div class="wrapper" style="display:none;"><div class="flower"></div></div>
+            <div class="flower-message" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('video_bg');
+        const drawCanvas = document.getElementById('draw_canvas');
+        const drawCtx = drawCanvas.getContext('2d');
+        const handCanvas = document.getElementById('hand_canvas');
+        const handCtx = handCanvas.getContext('2d');
+        const statusText = document.getElementById('status-text');
+
+        function resizeCanvas() {
+            drawCanvas.width = window.innerWidth; drawCanvas.height = window.innerHeight;
+            handCanvas.width = window.innerWidth; handCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let currentColor = '#FFFFFF';
+        let isDrawing = [false, false];
+        let prevPoints = [{x: 0, y: 0}, {x: 0, y: 0}];
+
+        function setColor(color, btnId) {
+            currentColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(btnId);
+            if(activeBtn) activeBtn.classList.add('active');
+        }
+
+        function clearCanvas() { 
+            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); 
+            statusText.innerText = "✨ Lienzo Limpio";
+            setTimeout(() => statusText.innerText = "Listos 🎀", 1500);
+        }
+
+        function saveCanvas() {
+            const saveTempCanvas = document.createElement('canvas');
+            const saveTempCtx = saveTempCanvas.getContext('2d');
+            saveTempCanvas.width = drawCanvas.width; saveTempCanvas.height = drawCanvas.height;
+            saveTempCtx.fillStyle = '#111111'; saveTempCtx.fillRect(0, 0, saveTempCanvas.width, saveTempCanvas.height);
+            saveTempCtx.save(); saveTempCtx.translate(saveTempCanvas.width, 0); saveTempCtx.scale(-1, 1);
+            saveTempCtx.drawImage(drawCanvas, 0, 0); saveTempCtx.restore();
+            
+            const link = document.createElement('a');
+            link.download = `mi-obra-kitty-${Date.now()}.png`;
+            link.href = saveTempCanvas.toDataURL('image/png');
+            link.click();
+
+            // Transición a la flor
+            document.getElementById('section-kitty').style.display = 'none';
+            document.getElementById('section-flower').style.display = 'block';
+            
+            // Iniciar la flor automáticamente activando el evento DOMContentLoaded de la flor
+            const event = new Event('DOMContentLoaded');
+            window.dispatchEvent(event);
+        }
+
+        function onResults(results) {
+            handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+            if (results.multiHandLandmarks) {
+                for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                    const hand = results.multiHandLandmarks[i];
+                    drawConnectors(handCtx, hand, HAND_CONNECTIONS, { color: '#ec4899', lineWidth: 3 });
+                    drawLandmarks(handCtx, hand, { color: '#ffffff', lineWidth: 1, radius: 3 });
+
+                    const indexUp = hand[8].y < hand[6].y;
+                    const middleUp = hand[12].y < hand[10].y;
+                    const ringUp = hand[16].y < hand[14].y;
+                    const pinkyUp = hand[20].y < hand[18].y;
+                    const isRightHand = results.multiHandedness[i].label === 'Right';
+                    const thumbUp = isRightHand ? (hand[4].x < hand[3].x) : (hand[4].x > hand[3].x);
+
+                    const fingersCount = [indexUp, middleUp, ringUp, pinkyUp, thumbUp].filter(Boolean).length;
+
+                    if (!isDrawing[i]) {
+                        if (fingersCount === 2 && indexUp && middleUp && !ringUp && !pinkyUp) setColor('#EC4899', 'btn-pink');
+                        else if (fingersCount === 3 && indexUp && middleUp && ringUp && !pinkyUp) setColor('#FFFFFF', 'btn-white');
+                        else if (fingersCount === 4 && indexUp && middleUp && ringUp && pinkyUp && !thumbUp) setColor('#000000', 'btn-black');
+                        else if (fingersCount === 5) setColor('#FBBF24', 'btn-yellow');
+                    }
+
+                    if (fingersCount === 1 && indexUp) {
+                        const px = hand[8].x * drawCanvas.width;
+                        const py = hand[8].y * drawCanvas.height;
+                        if (!isDrawing[i]) { isDrawing[i] = true; prevPoints[i] = { x: px, y: py }; }
+                        else {
+                            drawCtx.beginPath(); drawCtx.moveTo(prevPoints[i].x, prevPoints[i].y);
+                            drawCtx.lineTo(px, py); drawCtx.lineCap = 'round'; drawCtx.lineWidth = 14;
+                            drawCtx.strokeStyle = currentColor; drawCtx.stroke();
+                            prevPoints[i] = { x: px, y: py };
+                        }
+                    } else { isDrawing[i] = false; }
+                }
+            }
+        }
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.8, minTrackingConfidence: 0.8 });
+        hands.onResults(onResults);
+        new Camera(videoElement, { onFrame: async () => { await hands.send({image: videoElement}); }, width: 1280, height: 720 }).start();
+    </script>
+
+    <script>
+    window.addEventListener('DOMContentLoaded', function() {
+        // Solo ejecutar si la sección de la flor está visible
+        if (document.getElementById('section-flower').style.display !== 'block') {
+            return; 
+        }
+
+        var doc = document;
+        var flower = doc.querySelector('.flower');
+        var maxParts = 20;
+        var maxPetals = 8; 
+        var partsFontStep = 25 / maxParts;
+
+        function createFlower() {
+            var angle = 360 / maxPetals;
+            for (var i = 0; i < maxPetals; i++) {
+                var petal = createPetal();
+                var currAngle = angle * i + 'deg';
+                var transform = 'transform: rotateY(' + currAngle + ') rotateX(-25deg) translateZ(9vmin)';
+                petal.setAttribute('style', transform);
+                flower.appendChild(petal);
+            }
+        }
+
+        function createPetal() {
+            var box = createBox(null, 0);
+            var petal = doc.createElement('div');
+            petal.classList.add('petal');
+            for (var i = 1; i <= maxParts; i++) { box = createBox(box, i); }
+            petal.appendChild(box);
+            return petal;
+        }
+
+        function createBox(box, pos) {
+            var fontSize = partsFontStep * (maxParts - pos) + 'vmin';
+            var half = maxParts / 2;
+            var bright = '55'; 
+            if (pos < half + 1) { fontSize = partsFontStep * pos + 'vmin'; } 
+            else { bright = 20 + 35 / half * (maxParts - pos); }
+            var color = 'hsl(' + (50 + (15 * pos / maxParts)) + ', 95%, ' + bright + '%)';
+            var newShape = doc.createElement('div'); newShape.classList.add('shape');
+            var newBox = doc.createElement('div'); newBox.classList.add('box');
+            newBox.setAttribute('style', 'color: ' + color + '; font-size: ' + fontSize);
+            if (box) newBox.appendChild(box); newBox.appendChild(newShape);
+            return newBox;
+        }
+
+        createFlower();
+
+        const messages = ['Incluso en la oscuridad,', 'puedes encontrar la fuerza', 'para florecer de nuevo.', 'Tu luz interior', 'es inquebrantable.', 'Sigue adelante <3'];
+        var wrapper = document.querySelector('.wrapper');
+        var msgContainer = document.querySelector('.flower-message');
+        var dots = []; 
+
+        // --- INICIO AUTOMÁTICO DE LA ESCENA ---
+        var isMobile = window.innerWidth <= 600;
+        document.getElementById('start-btn-container').style.display = 'none'; // Asegurar que el contenedor del botón esté oculto
+        wrapper.style.display = '';
+        var music = document.getElementById('bg-music');
+        if (music) { music.play().catch(() => { console.log("El audio automático puede ser bloqueado por el navegador."); }); }
+
+        setTimeout(function() {
+            var galaxyCanvas = document.getElementById('galaxy-canvas');
+            galaxyCanvas.style.display = '';
+            var ctx = galaxyCanvas.getContext('2d');
+            function resizeCanvas() { galaxyCanvas.width = window.innerWidth; galaxyCanvas.height = window.innerHeight; }
+            resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+            var numDots = isMobile ? 40 : 80;
+            for(let i=0; i<numDots; i++){
+                let angle = Math.random() * 2 * Math.PI;
+                let radius = Math.random() * (Math.max(window.innerWidth, window.innerHeight) / 2);
+                dots.push({x: window.innerWidth/2 + Math.cos(angle)*radius, y: window.innerHeight/2 + Math.sin(angle)*radius, r: Math.random()*1.8+0.3, dx: (Math.random()-0.5)*0.6, dy: (Math.random()-0.5)*0.6, hue: 45+Math.random()*15, alpha: 0.4+Math.random()*0.5});
+            }
+            function animateGalaxy() {
+                ctx.clearRect(0, 0, galaxyCanvas.width, galaxyCanvas.height);
+                dots.forEach(dot => {
+                    ctx.beginPath(); ctx.arc(dot.x, dot.y, dot.r, 0, 7); ctx.fillStyle = `hsla(${dot.hue}, 80%, 70%, ${dot.alpha})`; ctx.fill();
+                    dot.x += dot.dx; dot.y += dot.dy;
+                    if (dot.x < 0) dot.x = galaxyCanvas.width; if (dot.x > galaxyCanvas.width) dot.x = 0;
+                    if (dot.y < 0) dot.y = galaxyCanvas.height; if (dot.y > galaxyCanvas.height) dot.y = 0;
+                });
+                requestAnimationFrame(animateGalaxy);
+            }
+            galaxyCanvas.style.opacity = '1'; animateGalaxy();
+        }, 1800);
+
+        msgContainer.style.display = '';
+        setTimeout(() => { msgContainer.style.opacity = 1; }, 100);
+        let currentMsg = 0;
+        function showNext() {
+            if (currentMsg < messages.length) {
+                let text = messages[currentMsg]; msgContainer.textContent = ''; let i = 0;
+                function type() {
+                    if (i < text.length) { msgContainer.textContent += text.charAt(i); i++; setTimeout(type, 90); }
+                    else { currentMsg++; setTimeout(showNext, 1200); }
+                }
+                type();
+            }
+        }
+        showNext();
+    });
+    </script>
+</body>
+</html>
